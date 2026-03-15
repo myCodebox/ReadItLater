@@ -204,8 +204,8 @@ func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML temp
 			image = ogImg
 		}
 	}
-	video = extractVideo(article.Content, originalHTML, urlStr)
-	audio = extractAudio(article.Content, originalHTML, urlStr)
+	video = extractResource(article.Content, originalHTML, urlStr, "video", findVideoInJSONLD)
+	audio = extractResource(article.Content, originalHTML, urlStr, "audio", findAudioInJSONLD)
 	formattedHTML := PrettyPrintHTML(article.Content)
 	bodyHTML = template.HTML(formattedHTML)
 	cleanText = cleanUpText(article.TextContent)
@@ -213,19 +213,32 @@ func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML temp
 }
 
 func extractImage(articleHTML, originalHTML, baseURL string) string {
-	// 1. Aus Article-Content
+	// 1. Amazon-spezifisch: Suche nach data-old-hires für große Produktbilder
+	if strings.Contains(baseURL, "amazon.") {
+		if largeImg := findAmazonLargeImage(originalHTML); largeImg != "" {
+			return resolveURL(baseURL, largeImg)
+		}
+	}
+	// 2. Etsy-spezifisch: OG-Image bevorzugen
+	if strings.Contains(baseURL, "etsy.") {
+		ogJSONString := extractOpenGraph(originalHTML)
+		if ogImg := findOGImageFromJSON(ogJSONString); ogImg != "" {
+			return resolveURL(baseURL, ogImg)
+		}
+	}
+	// 3. Aus Article-Content
 	if img := findFirstSrcInTag(articleHTML, "img"); img != "" {
 		return resolveURL(baseURL, img)
 	}
-	// 2. Aus Original-HTML
+	// 4. Aus Original-HTML
 	if img := findFirstSrcInTag(originalHTML, "img"); img != "" {
 		return resolveURL(baseURL, img)
 	}
-	// 3. Background-Image in Style-Attributen
+	// 5. Background-Image in Style-Attributen
 	if img := findBackgroundImage(originalHTML); img != "" {
 		return resolveURL(baseURL, img)
 	}
-	// 4. Background-Image in <style>-Tags
+	// 6. Background-Image in <style>-Tags
 	if img := findBackgroundImageInStyleTag(originalHTML); img != "" {
 		return resolveURL(baseURL, img)
 	}
@@ -255,6 +268,25 @@ func findFirstSrcInTag(htmlStr, tag string) string {
 		return src == ""
 	})
 	return src
+}
+
+// Amazon-spezifische Bildersuche: Suche nach data-old-hires für große Produktbilder
+func findAmazonLargeImage(htmlStr string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
+	if err != nil {
+		return ""
+	}
+	img := doc.Find("#landingImage")
+	if img.Length() > 0 {
+		if hires, exists := img.Attr("data-old-hires"); exists && hires != "" {
+			return hires
+		}
+		// Fallback: src-Attribut
+		if src, exists := img.Attr("src"); exists && src != "" {
+			return src
+		}
+	}
+	return ""
 }
 
 func findBackgroundImage(htmlStr string) string {
@@ -309,34 +341,18 @@ func findBackgroundImageInStyleTag(htmlStr string) string {
 	return ""
 }
 
-func extractVideo(articleHTML, originalHTML, baseURL string) string {
+func extractResource(articleHTML, originalHTML, baseURL, tag string, jsonldFunc func(string) string) string {
 	// 1. Aus Article-Content
-	if vid := findFirstVideo(articleHTML); vid != "" {
-		return resolveURL(baseURL, vid)
+	if src := findFirstSrcInTag(articleHTML, tag); src != "" {
+		return resolveURL(baseURL, src)
 	}
 	// 2. Aus Original-HTML
-	if vid := findFirstVideo(originalHTML); vid != "" {
-		return resolveURL(baseURL, vid)
+	if src := findFirstSrcInTag(originalHTML, tag); src != "" {
+		return resolveURL(baseURL, src)
 	}
 	// 3. Aus JSON-LD
-	if vid := findVideoInJSONLD(originalHTML); vid != "" {
-		return resolveURL(baseURL, vid)
-	}
-	return ""
-}
-
-func extractAudio(articleHTML, originalHTML, baseURL string) string {
-	// 1. Aus Article-Content
-	if aud := findFirstSrcInTag(articleHTML, "audio"); aud != "" {
-		return resolveURL(baseURL, aud)
-	}
-	// 2. Aus Original-HTML
-	if aud := findFirstSrcInTag(originalHTML, "audio"); aud != "" {
-		return resolveURL(baseURL, aud)
-	}
-	// 3. Aus JSON-LD
-	if aud := findAudioInJSONLD(originalHTML); aud != "" {
-		return resolveURL(baseURL, aud)
+	if src := jsonldFunc(originalHTML); src != "" {
+		return resolveURL(baseURL, src)
 	}
 	return ""
 }
