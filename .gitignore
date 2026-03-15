@@ -1,0 +1,46 @@
+# Betriebssystem-spezifische Dateien
+.DS_Store
+Thumbs.db
+
+# Editor-/IDE-spezifische Dateien
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Build- und Abhängigkeitsverzeichnisse
+node_modules/
+dist/
+build/
+out/
+target/
+bin/
+obj/
+coverage/
+
+# Logdateien
+*.log
+
+# Temporäre Dateien
+*.tmp
+*.swp
+*.bak
+*.old
+*.orig
+
+# Umgebungsdateien
+.env
+.env.*
+
+# Sonstiges
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# Go-spezifisch
+*.exe
+*.test
+*.out
+vendor/
