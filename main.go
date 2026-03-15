@@ -74,6 +74,9 @@ const pageTemplate = `
 		{{if .Video}}
 			<video src="{{.Video}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></video>
 		{{end}}
+		{{if .Audio}}
+			<audio src="{{.Audio}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></audio>
+		{{end}}
 		<h3>Bereinigter Text:</h3>
 		<textarea readonly>{{.CleanText}}</textarea>
 		<h3>Body HTML:</h3>
@@ -93,6 +96,7 @@ type PageData struct {
 	Title     string
 	Image     string
 	Video     string
+	Audio     string
 	BodyHTML  template.HTML
 	CleanText string
 	OpenGraph template.HTML
@@ -118,7 +122,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{}
 	urlStr := r.URL.Query().Get("url")
 	if urlStr != "" {
-		title, image, video, bodyHTML, cleanText, ogJSONString, err := analyzeURL(urlStr)
+		title, image, video, audio, bodyHTML, cleanText, ogJSONString, err := analyzeURL(urlStr)
 		data.URL = urlStr
 		data.Analyzed = true
 		if err != nil {
@@ -128,10 +132,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		data.Title = title
 		data.Image = image
 		data.Video = video
+		data.Audio = audio
 		data.BodyHTML = bodyHTML
 		data.CleanText = cleanText
 		data.OpenGraph = template.HTML(ogJSONString)
-		data.JSON = buildResultJSON(title, image, video, cleanText, bodyHTML, ogJSONString)
+		data.JSON = buildResultJSON(title, image, video, audio, cleanText, bodyHTML, ogJSONString)
 	}
 	if err := pageTmpl.Execute(w, data); err != nil {
 		log.Printf("Template-Fehler: %v", err)
@@ -139,31 +144,31 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func analyzeURL(urlStr string) (title, image, video string, bodyHTML template.HTML, cleanText string, ogJSONString string, err error) {
+func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML template.HTML, cleanText string, ogJSONString string, err error) {
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return "", "", "", "", "", "", fmt.Errorf("Fehler beim Erstellen der Anfrage: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Erstellen der Anfrage: %v", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", "", "", "", "", "", fmt.Errorf("Fehler beim Laden der Seite: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Laden der Seite: %v", err)
 	}
 	defer resp.Body.Close()
 	originalHTMLBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", "", "", "", "", fmt.Errorf("Fehler beim Lesen des HTML: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Lesen des HTML: %v", err)
 	}
 	originalHTML := string(originalHTMLBytes)
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return "", "", "", "", "", "", fmt.Errorf("Ungültige URL: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Ungültige URL: %v", err)
 	}
 	article, err := readability.FromReader(strings.NewReader(originalHTML), parsedURL)
 	if err != nil {
-		return "", "", "", "", "", "", fmt.Errorf("Readability-Fehler: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Readability-Fehler: %v", err)
 	}
 	title = article.Title
 	image = extractImage(article.Content, originalHTML, urlStr)
@@ -175,10 +180,11 @@ func analyzeURL(urlStr string) (title, image, video string, bodyHTML template.HT
 		}
 	}
 	video = extractVideo(article.Content, originalHTML, urlStr)
+	audio = extractAudio(article.Content, originalHTML, urlStr)
 	formattedHTML := PrettyPrintHTML(article.Content)
 	bodyHTML = template.HTML(formattedHTML)
 	cleanText = cleanUpText(article.TextContent)
-	return title, image, video, bodyHTML, cleanText, ogJSONString, nil
+	return title, image, video, audio, bodyHTML, cleanText, ogJSONString, nil
 }
 
 func extractImage(articleHTML, originalHTML, baseURL string) string {
@@ -282,6 +288,73 @@ func extractVideo(articleHTML, originalHTML, baseURL string) string {
 	return ""
 }
 
+func extractAudio(articleHTML, originalHTML, baseURL string) string {
+	// 1. Aus Article-Content
+	if aud := findFirstAudio(articleHTML); aud != "" {
+		return resolveURL(baseURL, aud)
+	}
+	// 2. Aus Original-HTML
+	if aud := findFirstAudio(originalHTML); aud != "" {
+		return resolveURL(baseURL, aud)
+	}
+	// 3. Aus JSON-LD
+	if aud := findAudioInJSONLD(originalHTML); aud != "" {
+		return resolveURL(baseURL, aud)
+	}
+	return ""
+}
+
+func findFirstAudio(htmlStr string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
+	if err != nil {
+		return ""
+	}
+	var audio string
+	doc.Find("audio").EachWithBreak(func(i int, s *goquery.Selection) bool {
+		src, exists := s.Attr("src")
+		if exists && src != "" {
+			audio = src
+			return false
+		}
+		s.Find("source").EachWithBreak(func(j int, ss *goquery.Selection) bool {
+			src, exists := ss.Attr("src")
+			if exists && src != "" {
+				audio = src
+				return false
+			}
+			return true
+		})
+		return audio == ""
+	})
+	return audio
+}
+
+func findAudioInJSONLD(htmlStr string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
+	if err != nil {
+		return ""
+	}
+	var audio string
+	doc.Find("script[type='application/ld+json']").EachWithBreak(func(i int, s *goquery.Selection) bool {
+		jsonText := s.Text()
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonText), &data); err == nil {
+			if val, ok := data["contentUrl"].(string); ok && val != "" {
+				audio = val
+				return false
+			}
+			if audioObj, ok := data["audio"].(map[string]interface{}); ok {
+				if val, ok := audioObj["contentUrl"].(string); ok && val != "" {
+					audio = val
+					return false
+				}
+			}
+		}
+		return true
+	})
+	return audio
+}
+
 func findFirstVideo(htmlStr string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
 	if err != nil {
@@ -378,13 +451,14 @@ func cleanUpText(text string) string {
 	return cleanText
 }
 
-func buildResultJSON(title, image, video, cleanText string, bodyHTML template.HTML, ogJSONString string) string {
+func buildResultJSON(title, image, video, audio, cleanText string, bodyHTML template.HTML, ogJSONString string) string {
 	var ogData map[string]interface{}
 	_ = json.Unmarshal([]byte(ogJSONString), &ogData)
 	jsonMap := map[string]interface{}{
 		"headline":  title,
 		"image":     image,
 		"video":     video,
+		"audio":     audio,
 		"clear":     cleanText,
 		"html":      string(bodyHTML),
 		"opengraph": ogData,
