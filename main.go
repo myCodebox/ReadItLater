@@ -167,8 +167,14 @@ func analyzeURL(urlStr string) (title, image, video string, bodyHTML template.HT
 	}
 	title = article.Title
 	image = extractImage(article.Content, originalHTML, urlStr)
-	video = extractVideo(article.Content, originalHTML, urlStr)
 	ogJSONString = extractOpenGraph(originalHTML)
+	// og:image als Fallback nutzen, falls kein Bild gefunden wurde
+	if image == "" {
+		if ogImg := findOGImageFromJSON(ogJSONString); ogImg != "" {
+			image = ogImg
+		}
+	}
+	video = extractVideo(article.Content, originalHTML, urlStr)
 	formattedHTML := PrettyPrintHTML(article.Content)
 	bodyHTML = template.HTML(formattedHTML)
 	cleanText = cleanUpText(article.TextContent)
@@ -192,6 +198,7 @@ func extractImage(articleHTML, originalHTML, baseURL string) string {
 	if img := findBackgroundImageInStyleTag(originalHTML); img != "" {
 		return resolveURL(baseURL, img)
 	}
+	// Kein Bild gefunden, Rückgabe leer (og:image wird später als Fallback genutzt)
 	return ""
 }
 
@@ -349,6 +356,19 @@ func extractOpenGraph(htmlStr string) string {
 	}
 	ogJSONBytes, _ := json.MarshalIndent(ogData, "", "  ")
 	return string(ogJSONBytes)
+}
+
+// Extrahiere og:image aus dem OpenGraph-JSON-String
+func findOGImageFromJSON(ogJSONString string) string {
+	var ogData map[string]interface{}
+	if err := json.Unmarshal([]byte(ogJSONString), &ogData); err == nil {
+		if val, ok := ogData["og:image"]; ok {
+			if img, ok := val.(string); ok && img != "" {
+				return img
+			}
+		}
+	}
+	return ""
 }
 
 func cleanUpText(text string) string {
