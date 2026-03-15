@@ -15,6 +15,14 @@ ReadItLater ist eine Anwendung, mit der du interessante Artikel, Links oder Noti
 
 ReadItLater hilft dir dabei, Informationsflut zu bändigen und spannende Inhalte nicht aus den Augen zu verlieren.
 
+## Server & Zugriff
+
+ReadItLater bringt einen integrierten Webserver mit. Nach dem Start erreichst du die Anwendung über deinen Browser:
+
+- **Adresse:** [http://localhost:8080](http://localhost:8080)
+
+Der Server lauscht standardmäßig auf Port 8080. Du kannst die Weboberfläche nutzen, um Links zu speichern, zu durchsuchen und zu verwalten.
+
 ## Features
 
 - Speichern von Links und Artikeln zum späteren Lesen
@@ -48,6 +56,8 @@ oder baue ein ausführbares Programm:
 go build -o readitlater
 ./readitlater
 ```
+
+Nach dem Start kannst du im Browser [http://localhost:8080](http://localhost:8080) auf die App zugreifen.
 
 ## Mitwirken
 
