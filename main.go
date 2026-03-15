@@ -72,7 +72,29 @@ const pageTemplate = `
 			<img src="{{.Image}}" alt="Artikelbild">
 		{{end}}
 		{{if .Video}}
-			<video src="{{.Video}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></video>
+			<div id="video-container" style="max-width:400px;display:block;margin-bottom:1em;">
+				<video id="video" controls style="width:100%;"></video>
+			</div>
+			<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+			<script>
+			(function() {
+				var videoSrc = "{{.Video}}";
+				var video = document.getElementById('video');
+				if (videoSrc && videoSrc.endsWith('.m3u8')) {
+					if (window.Hls && Hls.isSupported()) {
+						var hls = new Hls();
+						hls.loadSource(videoSrc);
+						hls.attachMedia(video);
+					} else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+						video.src = videoSrc;
+					} else {
+						document.getElementById('video-container').innerHTML = '<div style="color:red;">Dein Browser unterstützt dieses Videoformat nicht direkt. Bitte verwende Safari oder installiere eine HLS-Erweiterung.</div>';
+					}
+				} else if (videoSrc) {
+					video.src = videoSrc;
+				}
+			})();
+			</script>
 		{{end}}
 		{{if .Audio}}
 			<audio src="{{.Audio}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></audio>
@@ -122,6 +144,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{}
 	urlStr := r.URL.Query().Get("url")
 	if urlStr != "" {
+		if decoded, err := url.QueryUnescape(urlStr); err == nil {
+			urlStr = decoded
+		}
 		title, image, video, audio, bodyHTML, cleanText, ogJSONString, err := analyzeURL(urlStr)
 		data.URL = urlStr
 		data.Analyzed = true
@@ -431,11 +456,22 @@ func extractOpenGraph(htmlStr string) string {
 	return string(ogJSONBytes)
 }
 
-// Extrahiere og:image aus dem OpenGraph-JSON-String
+// Extrahiere og:image aus dem OpenGraph-JSON-String, inkl. Fallbacks für og:image:url und og:image:secure_url
 func findOGImageFromJSON(ogJSONString string) string {
 	var ogData map[string]interface{}
 	if err := json.Unmarshal([]byte(ogJSONString), &ogData); err == nil {
+		// Prüfe verschiedene Varianten
 		if val, ok := ogData["og:image"]; ok {
+			if img, ok := val.(string); ok && img != "" {
+				return img
+			}
+		}
+		if val, ok := ogData["og:image:url"]; ok {
+			if img, ok := val.(string); ok && img != "" {
+				return img
+			}
+		}
+		if val, ok := ogData["og:image:secure_url"]; ok {
 			if img, ok := val.(string); ok && img != "" {
 				return img
 			}
