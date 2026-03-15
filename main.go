@@ -214,11 +214,11 @@ func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML temp
 
 func extractImage(articleHTML, originalHTML, baseURL string) string {
 	// 1. Aus Article-Content
-	if img := findFirstImage(articleHTML); img != "" {
+	if img := findFirstSrcInTag(articleHTML, "img"); img != "" {
 		return resolveURL(baseURL, img)
 	}
 	// 2. Aus Original-HTML
-	if img := findFirstImage(originalHTML); img != "" {
+	if img := findFirstSrcInTag(originalHTML, "img"); img != "" {
 		return resolveURL(baseURL, img)
 	}
 	// 3. Background-Image in Style-Attributen
@@ -233,16 +233,28 @@ func extractImage(articleHTML, originalHTML, baseURL string) string {
 	return ""
 }
 
-func findFirstImage(htmlStr string) string {
+// Generische Funktion für das Finden von src-Attributen in Tags (img, audio, video)
+func findFirstSrcInTag(htmlStr, tag string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
 	if err != nil {
 		return ""
 	}
-	imgSrc, imgExists := doc.Find("img").First().Attr("src")
-	if imgExists && imgSrc != "" {
-		return imgSrc
-	}
-	return ""
+	var src string
+	doc.Find(tag).EachWithBreak(func(i int, s *goquery.Selection) bool {
+		if val, exists := s.Attr("src"); exists && val != "" {
+			src = val
+			return false
+		}
+		s.Find("source").EachWithBreak(func(j int, ss *goquery.Selection) bool {
+			if val, exists := ss.Attr("src"); exists && val != "" {
+				src = val
+				return false
+			}
+			return true
+		})
+		return src == ""
+	})
+	return src
 }
 
 func findBackgroundImage(htmlStr string) string {
@@ -315,11 +327,11 @@ func extractVideo(articleHTML, originalHTML, baseURL string) string {
 
 func extractAudio(articleHTML, originalHTML, baseURL string) string {
 	// 1. Aus Article-Content
-	if aud := findFirstAudio(articleHTML); aud != "" {
+	if aud := findFirstSrcInTag(articleHTML, "audio"); aud != "" {
 		return resolveURL(baseURL, aud)
 	}
 	// 2. Aus Original-HTML
-	if aud := findFirstAudio(originalHTML); aud != "" {
+	if aud := findFirstSrcInTag(originalHTML, "audio"); aud != "" {
 		return resolveURL(baseURL, aud)
 	}
 	// 3. Aus JSON-LD
@@ -327,31 +339,6 @@ func extractAudio(articleHTML, originalHTML, baseURL string) string {
 		return resolveURL(baseURL, aud)
 	}
 	return ""
-}
-
-func findFirstAudio(htmlStr string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
-	if err != nil {
-		return ""
-	}
-	var audio string
-	doc.Find("audio").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		src, exists := s.Attr("src")
-		if exists && src != "" {
-			audio = src
-			return false
-		}
-		s.Find("source").EachWithBreak(func(j int, ss *goquery.Selection) bool {
-			src, exists := ss.Attr("src")
-			if exists && src != "" {
-				audio = src
-				return false
-			}
-			return true
-		})
-		return audio == ""
-	})
-	return audio
 }
 
 func findAudioInJSONLD(htmlStr string) string {
@@ -381,28 +368,7 @@ func findAudioInJSONLD(htmlStr string) string {
 }
 
 func findFirstVideo(htmlStr string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
-	if err != nil {
-		return ""
-	}
-	var video string
-	doc.Find("video").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		src, exists := s.Attr("src")
-		if exists && src != "" {
-			video = src
-			return false
-		}
-		s.Find("source").EachWithBreak(func(j int, ss *goquery.Selection) bool {
-			src, exists := ss.Attr("src")
-			if exists && src != "" {
-				video = src
-				return false
-			}
-			return true
-		})
-		return video == ""
-	})
-	return video
+	return findFirstSrcInTag(htmlStr, "video")
 }
 
 func findVideoInJSONLD(htmlStr string) string {
