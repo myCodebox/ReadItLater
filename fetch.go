@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,10 +22,28 @@ const (
 	defaultBaseBackoff = 200 * time.Millisecond
 )
 
+var (
+	configuredMaxRetries  = defaultMaxRetries
+	configuredBaseBackoff = defaultBaseBackoff
+)
+
+func init() {
+	if v := os.Getenv("READITLATER_MAX_RETRIES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			configuredMaxRetries = n
+		}
+	}
+	if v := os.Getenv("READITLATER_BASE_BACKOFF_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+			configuredBaseBackoff = time.Duration(ms) * time.Millisecond
+		}
+	}
+}
+
 // doRequestWithRetry performs the HTTP request with retries on transient errors/status codes.
 func doRequestWithRetry(ctx context.Context, req *http.Request, maxRetries int) (*http.Response, error) {
 	attempt := 0
-	backoff := defaultBaseBackoff
+	backoff := configuredBaseBackoff
 	for {
 		resp, err := httpClient.Do(req)
 		if err != nil {

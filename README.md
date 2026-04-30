@@ -1,68 +1,89 @@
-# ReadItLater
+ReadItLater — Go Analyzer
 
-ReadItLater ist eine Anwendung, mit der du interessante Artikel, Links oder Notizen speichern und später lesen kannst. Sie eignet sich ideal, um Inhalte aus dem Web zu sammeln und zu organisieren.
+Kurz:
+Dieses kleine Tool lädt eine beliebige Webseite, extrahiert Titel, lesbaren Text (via go-readability), OpenGraph‑Daten sowie Medien (Bild, Video, Audio) und zeigt die Ergebnisse in einem simplen Web‑UI an. Es hat einen eingebauten persistenten Cache (SQLite), Retry‑Mechanismen und einfache UI‑Controls zum erneuten Laden (Refetch).
 
-## Was kannst du mit ReadItLater machen?
+Wofür es nützlich ist:
+- Schnell einzelne Artikel analysieren und den bereinigten Text / Medien extrahieren
+- Ergebnisse zwischenspeichern (persistenter Cache)
+- Basis für weitergehende Read‑it‑later / Scraping‑Workflows
 
-- **Artikel und Links speichern:** Füge interessante Webseiten, Blogposts oder Videos mit nur einem Klick deiner persönlichen Leseliste hinzu.
-- **Notizen anlegen:** Ergänze deine gespeicherten Links mit eigenen Notizen, um wichtige Gedanken oder To-dos festzuhalten.
-- **Kategorien und Tags nutzen:** Organisiere deine Einträge mit Kategorien oder Tags, damit du sie später schnell wiederfindest.
-- **Such- und Filterfunktionen:** Durchsuche deine Sammlung nach Stichworten, Tags oder Kategorien, um gezielt Inhalte zu finden.
-- **Lesestatus verwalten:** Markiere Einträge als „gelesen“ oder „ungelesen“, um den Überblick zu behalten.
-- **Favoriten festlegen:** Hebe besonders wichtige oder interessante Inhalte als Favoriten hervor.
-- **Plattformübergreifend zugreifen:** Greife von verschiedenen Geräten auf deine gespeicherten Inhalte zu (je nach Implementierung).
-- **Offline-Zugriff (optional):** Lies gespeicherte Artikel auch ohne Internetverbindung, sofern die App dies unterstützt.
+Voraussetzungen
+- Go (Version entsprechend `go.mod`, z. B. Go 1.20+)
+- Optional: Chromium/Headless (nicht notwendig; kein Browser‑Fallback in der Standardkonfiguration)
 
-ReadItLater hilft dir dabei, Informationsflut zu bändigen und spannende Inhalte nicht aus den Augen zu verlieren.
+Aufbau / relevante Dateien
+- `main.go` – Server‑Start, Logger (zap) und Cache‑Initialisierung
+- `server.go` – HTTP Handler / Template Rendering
+- `fetch.go` – HTTP‑Fetch, Prefetch, Retry‑Policy, Integration mit Readability
+- `extract.go` – Extraktionsfunktionen (OG, Bilder, JSON‑LD, etc.)
+- `templates.go` – HTML‑Template und kleine UI‑Skripte
+- `sqlcache.go` – SQLite‑basierter Cache (TTL + max entries + async writer)
+- `*_test.go` – Unit‑ und Integrationstests
 
-## Server & Zugriff
+Bauen & Starten (lokal)
+1) Code bauen / starten
 
-ReadItLater bringt einen integrierten Webserver mit. Nach dem Start erreichst du die Anwendung über deinen Browser:
+   go run .
 
-- **Adresse:** [http://localhost:8080](http://localhost:8080)
+2) Debug/Dev Modus (mehr Logs)
 
-Der Server lauscht standardmäßig auf Port 8080. Du kannst die Weboberfläche nutzen, um Links zu speichern, zu durchsuchen und zu verwalten.
+   go run . -debug
 
-## Features
+   oder per Environment:
 
-- Speichern von Links und Artikeln zum späteren Lesen
-- Kategorisierung und Tagging von Einträgen
-- Einfache Such- und Filterfunktionen
-- Minimalistische und benutzerfreundliche Oberfläche
+   READITLATER_DEBUG=1 go run .
 
-## Installation
+3) Optional: Konfiguration über Umgebungsvariablen
+- `READITLATER_ADDR` — Server Adresse (z. B. 127.0.0.1:8080). Default: 127.0.0.1:8080
+- `READITLATER_DEBUG` — wenn =1 oder "true" aktiviert Zap Dev Logging
+- `READITLATER_MAX_RETRIES` — maximale Retry‑Versuche für HTTP (Standard 3)
+- `READITLATER_BASE_BACKOFF_MS` — Basis Backoff in ms (Standard 200)
 
-1. Repository klonen:
-   ```
-   git clone https://github.com/dein-benutzername/ReadItLater.git
-   ```
-2. In das Projektverzeichnis wechseln:
-   ```
-   cd ReadItLater
-   ```
-3. Abhängigkeiten installieren (z.B. für Go-Projekte):
-   ```
-   go mod download
-   ```
+Beispiel:
 
-## Nutzung
+   READITLATER_MAX_RETRIES=5 READITLATER_BASE_BACKOFF_MS=500 go run .
 
-Starte die Anwendung mit:
-```
-go run main.go
-```
-oder baue ein ausführbares Programm:
-```
-go build -o readitlater
-./readitlater
-```
+Web‑UI
+- Öffne im Browser: http://127.0.0.1:8080/
+- Gib im Feld die gewünschte URL ein und klicke "Analysieren".
+- Die Seite zeigt Titel, bereinigten Text, Body HTML, OpenGraph JSON und ein Ergebnis‑JSON.
+- Wenn bereits eine Analyse im Cache vorliegt, wird das Ergebnis schnell zurückgegeben.
+- "Neu laden" (Refetch): erzwingt ein erneutes Laden (löscht Cache‑Eintrag vor Fetch). Bei Fehlern (z. B. Cloudflare JS‑Challenge) erscheint ein Dialog mit der Fehlermeldung und einem Button "In neuem Tab öffnen".
 
-Nach dem Start kannst du im Browser [http://localhost:8080](http://localhost:8080) auf die App zugreifen.
+Cache
+- Persistenter SQLite Cache liegt unter `cache/readitlater.db`
+- Default TTL: 10 Minuten
+- Default max entries: 1000
+- Schreibzugriffe erfolgen asynchron; es gibt einen Hintergrund‑Worker, der die DB schreibt.
 
-## Mitwirken
+Retry / Backoff
+- Netzwerkfehler und temporäre Serverfehler (429, 500, 502, 503, 504) werden mit Exponential Backoff und Jitter erneut versucht.
+- Anzahl Versuche und Basis‑Backoff sind konfigurierbar über ENV (siehe oben).
 
-Beiträge sind willkommen! Erstelle gerne einen Pull Request oder öffne ein Issue, wenn du Fehler findest oder neue Features vorschlagen möchtest.
+Fehlerbehandlung bei Bot‑/JS‑Challenges
+- Wenn die Zielseite eine JavaScript‑Challenge (z. B. Cloudflare) ausgibt, kann der Headless‑Fallback nicht automatisch gelöst werden (kein Browser‑Fallback standardmäßig).
+- Die App erkennt typische Challenge‑Markers und zeigt eine verständliche Fehlermeldung im UI an: "Seite wird durch eine JavaScript-/Bot‑Challenge ... Bitte öffne die URL im Browser und versuche es erneut.".
+- Workaround: Klicke im Dialog auf "In neuem Tab öffnen", löse die Challenge manuell im Browser und klicke dann "Neu laden" in der App.
 
-## Lizenz
+Logging
+- Structured logging via `go.uber.org/zap`.
+- Dev/Debug Mode (`-debug` oder `READITLATER_DEBUG`) aktiviert Dev‑Config von `zap` (menschlichere Logs).
 
-Dieses Projekt steht unter der MIT-Lizenz.
+Entwicklung / Tests
+- Unit‑ und Integrationstests sind vorhanden. Ausführen mit:
+
+   go test ./...
+
+- Formatierung: `gofmt -w .`
+
+Erweiterungen / Ideen
+- Optionaler Headless‑Browser‑Fallback (chromedp) für JS‑gesicherte Seiten — nicht integriert standardmäßig.
+- Stale‑while‑revalidate UX: sofortiges Zurückgeben von Cache und Hintergrund‑Refresh.
+- Verbesserte OG/JSON‑LD‑Normalization und Domain‑spezifische Heuristiken.
+
+Lizenz & Hinweise
+- Das Projekt ist ein privates Hilfswerkzeug. Achte beim Scrapen auf die Nutzungsbedingungen der Zielwebseiten.
+
+Kontakt
+- Falls du weitere Features möchtest oder Bugs findest — sag Bescheid. Ich helfe beim Erweitern oder beim Erstellen von PRs.
