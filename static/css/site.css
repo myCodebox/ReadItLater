@@ -1,4 +1,4 @@
-/* Neutral, minimal site styles for ReadItLater Go Analyzer */
+.actions/* Neutral, minimal site styles for ReadItLater Go Analyzer */
 :root {
     --bg: #ffffff;
     --text: #111111; /* near-black for clarity */
@@ -83,76 +83,200 @@ body {
     border: 1px solid var(--border);
 }
 
-/* New compact single-line search row */
-.search-row {
+/* Centered Hero styles */
+.hero {
     display: flex;
-    align-items: center;
-    gap: 0.5rem; /* restore moderate gap */
+    justify-content: center;
+    padding: 1.25rem 0 1rem 0;
+}
+.hero-inner {
     width: 100%;
+    max-width: 1100px;
+    padding: 1rem 1.25rem;
     box-sizing: border-box;
-    padding: 0 0.5rem; /* inner padding to breathe inside card */
 }
-.search-label {
-    flex: 0 0 6.5rem; /* slightly wider label */
-    font-weight: 600;
-    color: var(--text);
-    margin: 0 0.5rem 0 0; /* small right margin */
+.hero-title {
+    font-size: 1.25rem;
+    margin: 0 0 0.25rem 0;
 }
-.search-input {
+.hero-sub {
+    margin: 0 0 0.75rem 0;
+}
+.hero-form {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+.hero-input {
     flex: 1 1 auto;
-    min-width: 0;
-    padding: 0.6rem 0.75rem; /* slightly larger input padding */
-    border-radius: 6px;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    border-radius: 8px;
     border: 1px solid var(--input-border);
     background: var(--input-bg);
     color: var(--text);
-    white-space: nowrap; /* don't wrap long url */
-    overflow-x: auto;
-}
-.search-input::placeholder {
-    color: var(--muted);
-    opacity: 0.85;
-}
-.search-input:focus {
-    outline: none;
-    box-shadow: 0 0 0 4px var(--focus-ring);
-    border-color: var(--input-border);
-}
-
-.search-actions {
-    display: inline-flex;
-    gap: 0.6rem; /* slightly larger gap between buttons */
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03) inset;
+    min-height: 44px; /* ensure consistent height */
+    display: flex;
     align-items: center;
-    flex: 0 0 auto;
-    margin-left: 0.5rem; /* small separation to the right */
+}
+.hero-input::placeholder {
+    color: var(--muted);
+}
+.hero-actions {
+    display: inline-flex;
+    gap: 0.6rem;
+    align-items: center; /* vertical center buttons with input */
+}
+.hero-actions .btn {
+    padding: 0 1rem; /* horizontal padding only */
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-sizing: border-box;
 }
 
-/* align button heights with input */
+/* Normalize general button sizing to match hero buttons */
 .btn {
-    padding: 0.55rem 0.9rem;
-    min-height: 42px;
-}
-.btn + .btn {
-    margin-left: 0.5rem;
+    padding: 0 1rem;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 0.95rem;
 }
 
-/* On very small screens, allow wrapping and stack actions */
-@media (max-width: 520px) {
-    .search-row {
-        flex-wrap: wrap;
-        padding: 0 0.6rem;
+.btn-primary {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--btn-border);
+}
+
+/* Responsive: stack on small screens */
+@media (max-width: 720px) {
+    .hero-inner {
+        padding: 0.5rem;
     }
-    .search-label {
-        flex: 0 0 100%;
+    .hero-form {
+        flex-direction: column;
+        gap: 0.5rem;
     }
-    .search-input {
-        flex: 1 1 100%;
+    .hero-actions {
+        width: 100%;
+        justify-content: space-between;
     }
-    .search-actions {
-        flex: 0 0 100%;
-        justify-content: flex-start;
+    .btn {
+        width: 48%;
     }
 }
+
+/* --- keep previous search-row styles but hidden to avoid conflict --- */
+.search-row {
+    display: none;
+}
+
+/* Result layout: two-column media + details */
+.result {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+}
+.result-header {
+    margin-bottom: 0.6rem;
+}
+.result-title {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.result-body {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+.result-media {
+    flex: 0 0 60%;
+}
+.result-info {
+    flex: 1 1 40%;
+}
+
+.media-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+.media-card img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    display: block;
+}
+.media-card .media-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.45rem;
+    font-weight: 600;
+}
+
+.video-card video {
+    border-radius: 6px;
+    display: block;
+}
+.audio-card audio {
+    display: block;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+}
+.info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem;
+}
+.info-card h3 {
+    margin: 0 0 0.45rem 0;
+    font-size: 0.95rem;
+}
+.info-card textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--textarea-border);
+    background: var(--textarea-bg);
+    color: var(--text);
+    box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+    .result-body {
+        flex-direction: column;
+    }
+    .result-media {
+        flex: 1 1 auto;
+    }
+    .result-info {
+        flex: 1 1 auto;
+    }
+}
+
 .btn {
     padding: 0.45rem 0.7rem;
     min-height: 36px;
@@ -351,4 +475,34 @@ dialog {
     .result-section {
         flex: 1 1 45%;
     }
+}
+
+/* Revert overrides: restore previous button/input sizing (last two edits undone) */
+/* Keep these rules at the end to override previous conflicting declarations */
+.hero-input {
+    /* original-ish sizing: min-height and centered content */
+    min-height: 44px;
+    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+.hero-actions .btn {
+    /* match input visually but keep original padding */
+    padding: 0 1rem;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+.btn {
+    /* restore previous general button sizing */
+    padding: 0.7rem 1rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-sizing: border-box;
 }
