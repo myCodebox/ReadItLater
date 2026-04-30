@@ -1,241 +1,159 @@
-.actions/* Neutral, minimal site styles for ReadItLater Go Analyzer */
+/* ReadItLater - high-contrast stylesheet (clean replacement)
+   - Centralized variables for light/dark
+   - Strong borders and shadows in light mode (#333 border)
+   - Responsive Hero + Result layout
+*/
 :root {
-    /* Strongly darkened light-mode palette for clear element separation */
-    --bg: #e0e7ee; /* slightly darker page background */
-    --text: #000000; /* pure black for maximum contrast */
-    --muted: #1f2a33; /* dark muted */
-    --card-bg: #fbfdff; /* cards stay white but distinct */
-    --border: #666666; /* darker border for clear separation */
-    --accent: #111418; /* neutral accent */
+    /* Light mode (default) - softened */
+    --bg: #f7fafc; /* slightly lighter page background */
+    --card-bg: #ffffff; /* card / surface */
     --surface: #ffffff;
-    --danger: #661212;
-    /* textarea specific (slightly darker than surface) */
-    --textarea-bg: #fbfbfb;
-    --textarea-border: #eee;
-    /* form/input/button vars */
-    --form-bg: var(--surface);
-    --input-bg: #ffffff; /* clean white inputs */
-    --input-border: #666666;
-    --btn-bg: #ffffff;
-    --btn-border: #666666;
-    --btn-text: var(--text);
-    --focus-ring: rgba(0, 0, 0, 0.32);
+    --text: #000000; /* primary text */
+    --muted: #4b5563; /* softer muted */
 
-    /* primary button (filled) */
-    --primary-bg: #0b1220; /* strong dark CTA */
+    /* borders / inputs (softer) */
+    --border: #e5e7eb; /* lighter border for softer look */
+    --input-border: #e6e9ee;
+    --textarea-border: #e6e9ee;
+    --btn-border: #e6e9ee;
+
+    /* accents */
+    --accent: #374151;
+    --primary-bg: #0b1220; /* primary CTA (unchanged) */
     --primary-text: #ffffff;
-    /* prominent card shadow for depth */
-    --card-shadow: rgba(0, 0, 0, 0.36);
+
+    /* shadows / focus (subtle) */
+    --card-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+    --focus-ring: 0 0 0 4px rgba(2, 6, 23, 0.06);
+
+    --gutter: 1rem;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #040506;
+        --bg: #071019;
+        --card-bg: #0b1116;
+        --surface: #0b1116;
         --text: #e6eef6;
-        --muted: #98a0a6;
-        --card-bg: #071019;
-        --border: #0f1112;
-        --accent: #9aa4af; /* neutral grey, avoid blue */
-        --surface: #071019;
-        /* textarea darker but still neutral */
-        --textarea-bg: #0b0f12;
+        --muted: #93a0a8;
+
+        --border: #1b2226;
+        --input-border: #162022;
         --textarea-border: #15181a;
-        /* form/input/button vars for dark-mode */
-        --form-bg: #08121a; /* slightly lighter than surface */
-        --input-bg: #0b1116; /* input lighter to stand out */
-        --input-border: #162022; /* slightly lighter border */
-        --btn-bg: #0b1116; /* neutral button bg */
         --btn-border: #162022;
-        --btn-text: #e6eef6;
-        --focus-ring: rgba(230, 238, 246, 0.06);
+
+        --accent: #9aa4ad;
+        --primary-bg: #17202a;
+        --primary-text: #e6eef6;
+
+        --card-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+        --focus-ring: 0 0 0 4px rgba(230, 238, 246, 0.06);
     }
 }
 
+/* Base reset */
+* {
+    box-sizing: border-box;
+}
 html,
 body {
     height: 100%;
 }
 body {
     margin: 1.5rem;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-        Arial, "Noto Sans";
     background: var(--bg);
     color: var(--text);
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial;
     line-height: 1.45;
 }
-
 .container {
-    max-width: 980px;
+    max-width: 1100px;
     margin: 0 auto;
 }
-.site-header {
-    margin-bottom: 1rem;
-}
-.site-header h1 {
-    font-size: 1.4rem;
-    margin: 0 0 4px 0;
-}
-.site-header .muted {
-    margin: 0;
-}
 
-.search-form {
-    display: block;
-    /* increased card padding for more breathing room */
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.6rem;
-    border-radius: 8px;
-    background: var(--form-bg);
-    border: 1px solid var(--border);
-}
-
-/* Centered Hero styles */
+/* HERO */
 .hero {
     display: flex;
     justify-content: center;
-    padding: 1.25rem 0 1rem 0;
+    padding: 1.25rem 0;
 }
 .hero-inner {
     width: 100%;
     max-width: 1100px;
-    padding: 1rem 1.25rem;
-    box-sizing: border-box;
+    padding: 1rem;
+    background: var(--card-bg); /* white in light mode */
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
 }
 .hero-title {
     font-size: 1.25rem;
     margin: 0 0 0.25rem 0;
+    font-weight: 700;
 }
 .hero-sub {
     margin: 0 0 0.75rem 0;
+    color: var(--muted);
 }
 .hero-form {
     display: flex;
     gap: 0.75rem;
     align-items: center;
+    width: 100%;
 }
 .hero-input {
     flex: 1 1 auto;
-    padding: 0.85rem 1rem;
-    font-size: 1rem;
+    height: 48px;
+    padding: 0 1rem;
     border-radius: 8px;
     border: 1px solid var(--input-border);
     background: var(--input-bg);
     color: var(--text);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03) inset;
-    min-height: 44px; /* ensure consistent height */
-    display: flex;
-    align-items: center;
 }
 .hero-input::placeholder {
     color: var(--muted);
 }
+
 .hero-actions {
     display: inline-flex;
     gap: 0.6rem;
-    align-items: center; /* vertical center buttons with input */
 }
-.hero-actions .btn {
-    padding: 0 1rem; /* horizontal padding only */
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    box-sizing: border-box;
-}
-
-/* Normalize general button sizing to match hero buttons */
 .btn {
-    padding: 0 1rem;
-    height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    height: 48px;
+    padding: 0 1rem;
     border-radius: 8px;
-    box-sizing: border-box;
-    font-size: 0.95rem;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--text);
+    cursor: pointer;
 }
-
 .btn-primary {
     background: var(--primary-bg);
     color: var(--primary-text);
-    border: 1px solid var(--btn-border);
+    border-color: var(--primary-bg);
 }
-
 .btn-secondary {
     background: transparent;
-    border: 1px solid var(--btn-border);
+    color: var(--text);
+}
+.btn:focus {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
-/* Responsive: stack on small screens */
-@media (max-width: 720px) {
-    .hero-inner {
-        padding: 0.5rem;
-    }
-    /* Make hero input and actions stack and use full width */
-    .hero-form {
-        flex-direction: column;
-        gap: 0.6rem;
-        align-items: stretch;
-    }
-    .hero-input {
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .hero-actions {
-        width: 100%;
-        justify-content: space-between;
-        display: flex;
-        gap: 0.5rem;
-    }
-    .hero-actions .btn {
-        width: 100%;
-    }
-
-    /* Results stack vertically and use full width */
-    .result-body {
-        flex-direction: column;
-    }
-    .result-media,
-    .result-info {
-        flex: 1 1 100%;
-        width: 100%;
-    }
-    .media-card img,
-    .video-card video {
-        max-width: 100%;
-        height: auto;
-    }
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
-    .info-card textarea {
-        min-height: 160px;
-    }
-
-    /* Slightly reduce paddings for mobile density */
-    .media-card,
-    .info-card {
-        padding: 0.5rem;
-    }
-    .result {
-        padding: 0.75rem;
-    }
-}
-
-/* --- keep previous search-row styles but hidden to avoid conflict --- */
-.search-row {
-    display: none;
-}
-
-/* Result layout: two-column media + details */
+/* RESULTS */
 .result {
     margin-top: 1rem;
     padding: 1rem;
     border-radius: 10px;
     background: var(--card-bg);
     border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
 }
 .result-header {
     margin-bottom: 0.6rem;
@@ -243,8 +161,8 @@ body {
 .result-title {
     margin: 0;
     font-size: 1.05rem;
+    font-weight: 700;
 }
-
 .result-body {
     display: flex;
     gap: 1rem;
@@ -263,12 +181,7 @@ body {
     border-radius: 8px;
     padding: 0.6rem;
     margin-bottom: 0.75rem;
-}
-.media-card img {
-    width: 100%;
-    height: auto;
-    border-radius: 6px;
-    display: block;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 .media-card .media-label {
     font-size: 0.85rem;
@@ -276,12 +189,15 @@ body {
     margin-bottom: 0.45rem;
     font-weight: 600;
 }
-
+.media-card img,
 .video-card video {
+    width: 100%;
+    height: auto;
     border-radius: 6px;
     display: block;
 }
 .audio-card audio {
+    width: 100%;
     display: block;
 }
 
@@ -295,6 +211,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.6rem;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
 }
 .info-card h3 {
     margin: 0 0 0.45rem 0;
@@ -308,188 +225,9 @@ body {
     border: 1px solid var(--textarea-border);
     background: var(--textarea-bg);
     color: var(--text);
-    box-sizing: border-box;
 }
 
-@media (max-width: 900px) {
-    .result-body {
-        flex-direction: column;
-    }
-    .result-media {
-        flex: 1 1 auto;
-    }
-    .result-info {
-        flex: 1 1 auto;
-    }
-}
-
-.btn {
-    padding: 0.45rem 0.7rem;
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    border: 1px solid var(--btn-border);
-    background: var(--btn-bg);
-    color: var(--btn-text);
-    cursor: pointer;
-}
-.btn-secondary {
-    background: transparent;
-    border: 1px solid var(--btn-border);
-}
-.btn + .btn {
-    margin-left: 0.5rem;
-}
-
-@media (min-width: 800px) {
-    .form-row {
-        flex-direction: row;
-        align-items: center;
-    }
-    .form-row label {
-        width: 12rem;
-        margin-right: 0.75rem;
-        text-align: right;
-        flex: 0 0 12rem;
-    }
-    .url-input {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-    .actions {
-        margin-left: 0;
-        margin-top: 0;
-    }
-}
-
-/* stronger borders & card shadows for light mode */
-.result,
-.media-card,
-.info-card,
-.hero-inner,
-.search-form {
-    border-color: var(--border);
-    box-shadow: 0 8px 24px var(--card-shadow);
-}
-
-.hero-input,
-.search-input,
-textarea {
-    border-color: var(--input-border) !important;
-    background: var(--input-bg) !important;
-}
-
-.btn-secondary {
-    border-color: var(--btn-border) !important;
-    color: var(--muted);
-    background: transparent;
-}
-
-/* Button styles neutral */
-.btn {
-    padding: 0.45rem 0.7rem;
-    border-radius: 6px;
-    border: 1px solid var(--btn-border);
-    background: var(--btn-bg);
-    color: var(--btn-text);
-    cursor: pointer;
-}
-.btn:hover {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-.btn[disabled] {
-    opacity: 0.65;
-    cursor: not-allowed;
-}
-
-.result {
-    margin-top: 1rem;
-    padding: 0.9rem;
-    border-radius: 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-}
-.result-header {
-    margin-bottom: 0.6rem;
-}
-.result-title {
-    margin: 0;
-    font-size: 1.1rem;
-}
-
-/* media grid */
-.media-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-.media-item {
-    flex: 1 1 200px;
-    min-width: 160px;
-    max-width: 460px;
-    border: 1px solid var(--border);
-    padding: 0.5rem;
-    border-radius: 6px;
-    background: var(--surface);
-}
-.media-label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    font-weight: 600;
-    margin-bottom: 0.45rem;
-}
-.media-image img {
-    width: 100%;
-    height: auto;
-    border-radius: 4px;
-    display: block;
-}
-.media-video video {
-    width: 100%;
-    height: auto;
-    display: block;
-    border-radius: 4px;
-}
-.media-audio audio {
-    width: 100%;
-}
-
-.result-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem; /* increased spacing between textboxes */
-    flex-wrap: wrap; /* allow wrapping to limit columns */
-}
-.result-section h3 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.95rem;
-}
-.result-section textarea {
-    min-height: 140px;
-    background: var(--textarea-bg);
-    border: 1px solid var(--textarea-border);
-    color: var(--text);
-    padding: 0.75rem; /* more padding inside textboxes */
-    border-radius: 8px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* ensure max two columns on wider screens */
-.result-section {
-    flex: 1 1 100%;
-    padding: 0.35rem; /* small padding around sections */
-}
-@media (min-width: 800px) {
-    .result-section {
-        flex: 1 1 calc(50% - 0.75rem);
-    }
-}
-
-/* dialog */
+/* Dialog */
 dialog {
     padding: 0.8rem;
     border-radius: 8px;
@@ -497,17 +235,15 @@ dialog {
     background: var(--card-bg);
 }
 
-/* spinner */
+/* Spinner */
 .spinner {
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(0, 0, 0, 0.055);
-    border-top-color: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-top-color: rgba(0, 0, 0, 0.45);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-    vertical-align: middle;
-    margin-left: 0.5rem;
 }
 @keyframes spin {
     to {
@@ -515,148 +251,72 @@ dialog {
     }
 }
 
-/* responsive tweaks */
-@media (min-width: 800px) {
-    .form-row {
-        flex-direction: row;
-        align-items: center;
+/* Responsive */
+@media (max-width: 900px) {
+    .result-body {
+        flex-direction: column;
     }
-    .form-row label {
-        width: 12rem;
-        margin-right: 0.75rem;
-        text-align: right;
-        flex: 0 0 12rem;
+    .result-media,
+    .result-info {
+        flex: 1 1 100%;
     }
-    .url-input {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-    .actions {
-        margin-left: 0;
-        margin-top: 0;
-    }
-    .media-grid {
-        gap: 1rem;
-    }
-    .result-sections {
-        flex-direction: row;
-    }
-    .result-section {
-        flex: 1 1 45%;
+    .info-grid {
+        grid-template-columns: 1fr;
     }
 }
 
-/* Revert overrides: restore previous button/input sizing (last two edits undone) */
-/* Keep these rules at the end to override previous conflicting declarations */
-.hero-input {
-    /* original-ish sizing: min-height and centered content */
-    min-height: 44px;
-    padding: 0.85rem 1rem;
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-}
-.hero-actions .btn {
-    /* match input visually but keep original padding */
-    padding: 0 1rem;
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-}
-.btn {
-    /* restore previous general button sizing */
-    padding: 0.7rem 1rem;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    box-sizing: border-box;
-}
-
-/* Strong visual overrides for light mode: heavier borders & shadows */
-@media (prefers-color-scheme: light), (prefers-color-scheme: no-preference) {
-    .result,
-    .media-card,
-    .info-card,
-    .hero-inner,
-    .search-form {
-        border: 1px solid var(--border) !important;
-        box-shadow: 0 14px 40px var(--card-shadow) !important;
+@media (max-width: 720px) {
+    .hero-form {
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+    .hero-input {
+        width: 100%;
+    }
+    .hero-actions {
+        width: 100%;
+        display: flex;
+        gap: 0.6rem;
+    }
+    .hero-actions .btn {
+        width: 100%;
+    }
+    .btn {
+        height: 44px;
     }
     .media-card,
     .info-card {
-        border-width: 1px !important;
+        padding: 0.5rem;
     }
-    .hero-input,
-    .search-input,
-    textarea {
-        border: 1px solid var(--input-border) !important;
-        background: var(--input-bg) !important;
-    }
-    .btn,
-    .hero-actions .btn {
-        border: 1px solid var(--btn-border) !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-    }
-    .btn-primary {
-        background: var(--primary-bg) !important;
-        color: var(--primary-text) !important;
-        border-color: var(--primary-bg) !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    .info-card textarea {
+        min-height: 160px;
     }
 }
 
-/* Final normalization block: ensure borders use variables and prevent accidental overrides */
+/* Normalization: force variables for borders to avoid accidental overrides */
 :root {
     --_border: var(--border);
     --_input-border: var(--input-border);
     --_btn-border: var(--btn-border);
 }
-
-/* Structural elements */
 .result,
 .media-card,
 .info-card,
-.media-item,
 dialog,
 .search-form,
 .hero-inner {
     border: 1px solid var(--_border) !important;
-    background: var(--card-bg) !important;
-    box-shadow: 0 8px 24px var(--card-shadow) !important;
 }
-
-/* Inputs and text areas */
 .hero-input,
 .search-input,
 input[type="text"],
-textarea,
-.url-input {
+textarea {
     border: 1px solid var(--_input-border) !important;
-    background: var(--input-bg) !important;
-    color: var(--text) !important;
 }
-
-/* Buttons */
 .btn,
 .hero-actions .btn,
 .btn-secondary {
     border: 1px solid var(--_btn-border) !important;
-    background: var(--btn-bg) !important;
-    color: var(--btn-text) !important;
 }
 
-.btn-primary {
-    border: 1px solid var(--primary-bg) !important;
-    background: var(--primary-bg) !important;
-    color: var(--primary-text) !important;
-}
-
-/* spinner contrast */
-.spinner {
-    border-color: rgba(0, 0, 0, 0.12);
-    border-top-color: rgba(0, 0, 0, 0.45);
-}
+/* End of stylesheet */
