@@ -54,6 +54,8 @@ func main() {
 	addr := getServerAddr()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler)
+	// Serve static assets (CSS/JS)
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	fmt.Printf("Server läuft auf http://%s\n", addr)
 	// Default http client timeout
 	httpClient.Timeout = 15 * time.Second
