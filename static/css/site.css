@@ -1,24 +1,31 @@
 .actions/* Neutral, minimal site styles for ReadItLater Go Analyzer */
 :root {
-    --bg: #ffffff;
-    --text: #111111; /* near-black for clarity */
-    --muted: #6b6b6b; /* neutral gray */
-    --card-bg: #f7f7f7; /* very light neutral */
-    --border: #e1e1e1; /* neutral border */
-    --accent: #6b6b6b; /* neutral accent (gray) */
+    /* Strongly darkened light-mode palette for clear element separation */
+    --bg: #e0e7ee; /* slightly darker page background */
+    --text: #000000; /* pure black for maximum contrast */
+    --muted: #1f2a33; /* dark muted */
+    --card-bg: #fbfdff; /* cards stay white but distinct */
+    --border: #666666; /* darker border for clear separation */
+    --accent: #111418; /* neutral accent */
     --surface: #ffffff;
-    --danger: #8b1f1f;
+    --danger: #661212;
     /* textarea specific (slightly darker than surface) */
-    --textarea-bg: #f0f0f0;
-    --textarea-border: #d9d9d9;
+    --textarea-bg: #fbfbfb;
+    --textarea-border: #eee;
     /* form/input/button vars */
     --form-bg: var(--surface);
-    --input-bg: transparent;
-    --input-border: var(--border);
-    --btn-bg: var(--surface);
-    --btn-border: var(--border);
+    --input-bg: #ffffff; /* clean white inputs */
+    --input-border: #666666;
+    --btn-bg: #ffffff;
+    --btn-border: #666666;
     --btn-text: var(--text);
-    --focus-ring: rgba(0, 0, 0, 0.06);
+    --focus-ring: rgba(0, 0, 0, 0.32);
+
+    /* primary button (filled) */
+    --primary-bg: #0b1220; /* strong dark CTA */
+    --primary-text: #ffffff;
+    /* prominent card shadow for depth */
+    --card-shadow: rgba(0, 0, 0, 0.36);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -151,7 +158,8 @@ body {
 }
 
 .btn-primary {
-    background: var(--btn-bg);
+    background: var(--primary-bg);
+    color: var(--primary-text);
     border: 1px solid var(--btn-border);
 }
 
@@ -165,16 +173,54 @@ body {
     .hero-inner {
         padding: 0.5rem;
     }
+    /* Make hero input and actions stack and use full width */
     .hero-form {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.6rem;
+        align-items: stretch;
+    }
+    .hero-input {
+        width: 100%;
+        box-sizing: border-box;
     }
     .hero-actions {
         width: 100%;
         justify-content: space-between;
+        display: flex;
+        gap: 0.5rem;
     }
-    .btn {
-        width: 48%;
+    .hero-actions .btn {
+        width: 100%;
+    }
+
+    /* Results stack vertically and use full width */
+    .result-body {
+        flex-direction: column;
+    }
+    .result-media,
+    .result-info {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+    .media-card img,
+    .video-card video {
+        max-width: 100%;
+        height: auto;
+    }
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    .info-card textarea {
+        min-height: 160px;
+    }
+
+    /* Slightly reduce paddings for mobile density */
+    .media-card,
+    .info-card {
+        padding: 0.5rem;
+    }
+    .result {
+        padding: 0.75rem;
     }
 }
 
@@ -318,6 +364,29 @@ body {
     }
 }
 
+/* stronger borders & card shadows for light mode */
+.result,
+.media-card,
+.info-card,
+.hero-inner,
+.search-form {
+    border-color: var(--border);
+    box-shadow: 0 8px 24px var(--card-shadow);
+}
+
+.hero-input,
+.search-input,
+textarea {
+    border-color: var(--input-border) !important;
+    background: var(--input-bg) !important;
+}
+
+.btn-secondary {
+    border-color: var(--btn-border) !important;
+    color: var(--muted);
+    background: transparent;
+}
+
 /* Button styles neutral */
 .btn {
     padding: 0.45rem 0.7rem;
@@ -328,14 +397,11 @@ body {
     cursor: pointer;
 }
 .btn:hover {
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 .btn[disabled] {
     opacity: 0.65;
     cursor: not-allowed;
-}
-.btn-secondary {
-    background: transparent;
 }
 
 .result {
@@ -457,14 +523,17 @@ dialog {
     }
     .form-row label {
         width: 12rem;
-        margin-right: 0.5rem;
+        margin-right: 0.75rem;
         text-align: right;
+        flex: 0 0 12rem;
     }
     .url-input {
-        width: 60%;
+        flex: 1 1 auto;
+        min-width: 0;
     }
     .actions {
-        margin-left: 12rem;
+        margin-left: 0;
+        margin-top: 0;
     }
     .media-grid {
         gap: 1rem;
@@ -505,4 +574,89 @@ dialog {
     justify-content: center;
     border-radius: 8px;
     box-sizing: border-box;
+}
+
+/* Strong visual overrides for light mode: heavier borders & shadows */
+@media (prefers-color-scheme: light), (prefers-color-scheme: no-preference) {
+    .result,
+    .media-card,
+    .info-card,
+    .hero-inner,
+    .search-form {
+        border: 1px solid var(--border) !important;
+        box-shadow: 0 14px 40px var(--card-shadow) !important;
+    }
+    .media-card,
+    .info-card {
+        border-width: 1px !important;
+    }
+    .hero-input,
+    .search-input,
+    textarea {
+        border: 1px solid var(--input-border) !important;
+        background: var(--input-bg) !important;
+    }
+    .btn,
+    .hero-actions .btn {
+        border: 1px solid var(--btn-border) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    }
+    .btn-primary {
+        background: var(--primary-bg) !important;
+        color: var(--primary-text) !important;
+        border-color: var(--primary-bg) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    }
+}
+
+/* Final normalization block: ensure borders use variables and prevent accidental overrides */
+:root {
+    --_border: var(--border);
+    --_input-border: var(--input-border);
+    --_btn-border: var(--btn-border);
+}
+
+/* Structural elements */
+.result,
+.media-card,
+.info-card,
+.media-item,
+dialog,
+.search-form,
+.hero-inner {
+    border: 1px solid var(--_border) !important;
+    background: var(--card-bg) !important;
+    box-shadow: 0 8px 24px var(--card-shadow) !important;
+}
+
+/* Inputs and text areas */
+.hero-input,
+.search-input,
+input[type="text"],
+textarea,
+.url-input {
+    border: 1px solid var(--_input-border) !important;
+    background: var(--input-bg) !important;
+    color: var(--text) !important;
+}
+
+/* Buttons */
+.btn,
+.hero-actions .btn,
+.btn-secondary {
+    border: 1px solid var(--_btn-border) !important;
+    background: var(--btn-bg) !important;
+    color: var(--btn-text) !important;
+}
+
+.btn-primary {
+    border: 1px solid var(--primary-bg) !important;
+    background: var(--primary-bg) !important;
+    color: var(--primary-text) !important;
+}
+
+/* spinner contrast */
+.spinner {
+    border-color: rgba(0, 0, 0, 0.12);
+    border-top-color: rgba(0, 0, 0, 0.45);
 }
