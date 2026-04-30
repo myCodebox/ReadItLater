@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -25,9 +27,13 @@ const (
 )
 
 var (
-	httpClient = &http.Client{
-		Timeout: 15 * time.Second,
-	}
+	// http client mit Default-Timeout
+	httpClient = &http.Client{}
+
+	// vorkompilierte Regexen
+	bgRe       = regexp.MustCompile(`background-image\s*:\s*url\(['"]?([^'\")]+)['"]?\)`)
+	featuredRe = regexp.MustCompile(`--featured-img\s*:\s*url\(['"]?([^'\")]+)['"]?\)`)
+
 	pageTmpl = template.Must(template.New("page").Funcs(template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
 	}).Parse(pageTemplate))
@@ -82,13 +88,17 @@ const pageTemplate = `
 				</div>
 			{{else}}
 				<div id="video-container" style="max-width:400px;display:block;margin-bottom:1em;">
-					<video id="video" controls style="width:100%;"></video>
+					<video id="video" controls style="width:100%;">
+						<source src="{{.Video}}">
+						Dein Browser unterstützt das Video-Tag nicht.
+					</video>
 				</div>
 				<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 				<script>
 				(function() {
 					var videoSrc = "{{.Video}}";
 					var video = document.getElementById('video');
+					// Falls HLS (.m3u8) vorhanden, versuche Hls.js oder native Unterstützung
 					if (videoSrc && videoSrc.endsWith('.m3u8')) {
 						if (window.Hls && Hls.isSupported()) {
 							var hls = new Hls();
@@ -98,6 +108,13 @@ const pageTemplate = `
 							video.src = videoSrc;
 						} else {
 							document.getElementById('video-container').innerHTML = '<div style="color:red;">Dein Browser unterstützt dieses Videoformat nicht direkt. Bitte verwende Safari oder installiere eine HLS-Erweiterung.</div>';
+						}
+					} else {
+						// Für normale MP4/WebM/etc. setzen wir die Quelle direkt
+						try {
+							video.src = videoSrc;
+						} catch (e) {
+							console.error('Fehler beim Setzen der Videoquelle', e);
 						}
 					}
 				})();
@@ -135,9 +152,9 @@ type PageData struct {
 	Image     string
 	Video     string
 	Audio     string
-	BodyHTML  template.HTML
+	BodyHTML  string
 	CleanText string
-	OpenGraph template.HTML
+	OpenGraph string
 	JSON      string
 	Analyzed  bool
 }
@@ -146,6 +163,8 @@ func main() {
 	addr := getServerAddr()
 	http.HandleFunc("/", handler)
 	fmt.Printf("Server läuft auf http://%s\n", addr)
+	// Default http client timeout
+	httpClient.Timeout = 15 * time.Second
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
@@ -176,7 +195,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		data.Audio = audio
 		data.BodyHTML = bodyHTML
 		data.CleanText = cleanText
-		data.OpenGraph = template.HTML(ogJSONString)
+		data.OpenGraph = ogJSONString
 		data.JSON = buildResultJSON(title, image, video, audio, cleanText, bodyHTML, ogJSONString)
 	}
 	if err := pageTmpl.Execute(w, data); err != nil {
@@ -185,34 +204,94 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML template.HTML, cleanText string, ogJSONString string, err error) {
-	req, err := http.NewRequest("GET", urlStr, nil)
+func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML string, cleanText string, ogJSONString string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
-		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Erstellen der Anfrage: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Erstellen der Anfrage: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Laden der Seite: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Laden der Seite: %w", err)
 	}
-	defer resp.Body.Close()
-	originalHTMLBytes, err := io.ReadAll(resp.Body)
+	// Falls 403, versuchen wir es nochmal mit einem Referer-Header und leicht abgewandeltem User-Agent
+	if resp.StatusCode == http.StatusForbidden {
+		// schließe ursprünglichen Body bevor wir neu anfragen
+		resp.Body.Close()
+		if parsed, perr := url.Parse(urlStr); perr == nil {
+			altReq, _ := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+			// kopiere einige Header
+			altReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:117.0) Gecko/20100101 Firefox/117.0")
+			altReq.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+			altReq.Header.Set("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
+			altReq.Header.Set("Referer", parsed.Scheme+"://"+parsed.Host+"/")
+			altResp, aerr := httpClient.Do(altReq)
+			if aerr == nil {
+				resp = altResp
+				// defer close for the response we'll use further down
+				defer resp.Body.Close()
+				if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+					// success with alternative headers; continue normally
+				} else {
+					// read small snippet for debugging
+					snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+					return "", "", "", "", "", "", "", fmt.Errorf("ungültiger Statuscode nach Retry: %d - %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+				}
+			} else {
+				return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Laden der Seite (Retry): %w", aerr)
+			}
+		} else {
+			return "", "", "", "", "", "", "", fmt.Errorf("ungültiger Statuscode: %d", resp.StatusCode)
+		}
+	} else {
+		// Wenn ursprüngliche Antwort kein 403 war, stelle sicher dass wir sie später schließen
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			return "", "", "", "", "", "", "", fmt.Errorf("ungültiger Statuscode: %d", resp.StatusCode)
+		}
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct != "" && !strings.Contains(strings.ToLower(ct), "text/html") {
+		// Nicht zwingend ein Fehler, aber meistens kein HTML zum Parsen
+		return "", "", "", "", "", "", "", fmt.Errorf("keine HTML-Antwort (Content-Type: %s)", ct)
+	}
+
+	// handle gzip-encoded responses
+	var reader io.Reader = resp.Body
+	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Encoding")), "gzip") {
+		gz, gzErr := gzip.NewReader(resp.Body)
+		if gzErr == nil {
+			defer gz.Close()
+			reader = gz
+		}
+	}
+
+	// Begrenze gelesene Daten, um OOM bei großen Antworten zu vermeiden
+	const maxBytes = 2 << 20 // 2 MiB
+	limitedReader := io.LimitReader(reader, maxBytes)
+	originalHTMLBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
-		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Lesen des HTML: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Fehler beim Lesen des HTML: %w", err)
 	}
 	originalHTML := string(originalHTMLBytes)
+
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return "", "", "", "", "", "", "", fmt.Errorf("Ungültige URL: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Ungültige URL: %w", err)
 	}
+
 	article, err := readability.FromReader(strings.NewReader(originalHTML), parsedURL)
 	if err != nil {
-		return "", "", "", "", "", "", "", fmt.Errorf("Readability-Fehler: %v", err)
+		return "", "", "", "", "", "", "", fmt.Errorf("Readability-Fehler: %w", err)
 	}
 	title = article.Title
-	image = extractImage(article.Content, originalHTML, urlStr)
+	image = extractImage(article.Content, originalHTML, parsedURL)
 	ogJSONString = extractOpenGraph(originalHTML)
 	// og:image als Fallback nutzen, falls kein Bild gefunden wurde
 	if image == "" {
@@ -220,43 +299,44 @@ func analyzeURL(urlStr string) (title, image, video, audio string, bodyHTML temp
 			image = ogImg
 		}
 	}
-	video = extractResource(article.Content, originalHTML, urlStr, "video", findVideoInJSONLD)
-	audio = extractResource(article.Content, originalHTML, urlStr, "audio", findAudioInJSONLD)
+	video = extractResource(article.Content, originalHTML, parsedURL, "video", findVideoInJSONLD)
+	audio = extractResource(article.Content, originalHTML, parsedURL, "audio", findAudioInJSONLD)
 	formattedHTML := PrettyPrintHTML(article.Content)
-	bodyHTML = template.HTML(formattedHTML)
+	bodyHTML = formattedHTML
 	cleanText = cleanUpText(article.TextContent)
 	return title, image, video, audio, bodyHTML, cleanText, ogJSONString, nil
 }
 
-func extractImage(articleHTML, originalHTML, baseURL string) string {
+// Anpassung: baseURL als *url.URL für robusteren Host-Vergleich / ResolveReference
+func extractImage(articleHTML, originalHTML string, base *url.URL) string {
 	// 1. Amazon-spezifisch: Suche nach data-old-hires für große Produktbilder
-	if strings.Contains(baseURL, "amazon.") {
+	if base != nil && strings.Contains(base.Hostname(), "amazon") {
 		if largeImg := findAmazonLargeImage(originalHTML); largeImg != "" {
-			return resolveURL(baseURL, largeImg)
+			return resolveURL(base, largeImg)
 		}
 	}
 	// 2. Etsy-spezifisch: OG-Image bevorzugen
-	if strings.Contains(baseURL, "etsy.") {
+	if base != nil && strings.Contains(base.Hostname(), "etsy") {
 		ogJSONString := extractOpenGraph(originalHTML)
 		if ogImg := findOGImageFromJSON(ogJSONString); ogImg != "" {
-			return resolveURL(baseURL, ogImg)
+			return resolveURL(base, ogImg)
 		}
 	}
 	// 3. Aus Article-Content
 	if img := findFirstSrcInTag(articleHTML, "img"); img != "" {
-		return resolveURL(baseURL, img)
+		return resolveURL(base, img)
 	}
 	// 4. Aus Original-HTML
 	if img := findFirstSrcInTag(originalHTML, "img"); img != "" {
-		return resolveURL(baseURL, img)
+		return resolveURL(base, img)
 	}
 	// 5. Background-Image in Style-Attributen
 	if img := findBackgroundImage(originalHTML); img != "" {
-		return resolveURL(baseURL, img)
+		return resolveURL(base, img)
 	}
 	// 6. Background-Image in <style>-Tags
 	if img := findBackgroundImageInStyleTag(originalHTML); img != "" {
-		return resolveURL(baseURL, img)
+		return resolveURL(base, img)
 	}
 	// Kein Bild gefunden, Rückgabe leer (og:image wird später als Fallback genutzt)
 	return ""
@@ -311,11 +391,10 @@ func findBackgroundImage(htmlStr string) string {
 		return ""
 	}
 	var bgImg string
-	re := regexp.MustCompile(`background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)`)
 	doc.Find("[style]").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		style, _ := s.Attr("style")
 		if strings.Contains(style, "background-image") {
-			matches := re.FindStringSubmatch(style)
+			matches := bgRe.FindStringSubmatch(style)
 			if len(matches) > 1 {
 				bgImg = matches[1]
 				return false
@@ -335,15 +414,13 @@ func findBackgroundImageInStyleTag(htmlStr string) string {
 	found := false
 	doc.Find("style").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		css := s.Text()
-		reBG := regexp.MustCompile(`background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)`)
-		matchesBG := reBG.FindStringSubmatch(css)
+		matchesBG := bgRe.FindStringSubmatch(css)
 		if len(matchesBG) > 1 {
 			image = matchesBG[1]
 			found = true
 			return false
 		}
-		reVar := regexp.MustCompile(`--featured-img\s*:\s*url\(['"]?([^'")]+)['"]?\)`)
-		matchesVar := reVar.FindStringSubmatch(css)
+		matchesVar := featuredRe.FindStringSubmatch(css)
 		if len(matchesVar) > 1 {
 			image = matchesVar[1]
 			found = true
@@ -357,18 +434,136 @@ func findBackgroundImageInStyleTag(htmlStr string) string {
 	return ""
 }
 
-func extractResource(articleHTML, originalHTML, baseURL, tag string, jsonldFunc func(string) string) string {
+// Anpassung: base als *url.URL
+func extractResource(articleHTML, originalHTML string, base *url.URL, tag string, jsonldFunc func(string) string) string {
 	// 1. Aus Article-Content
 	if src := findFirstSrcInTag(articleHTML, tag); src != "" {
-		return resolveURL(baseURL, src)
+		return resolveURL(base, src)
 	}
 	// 2. Aus Original-HTML
 	if src := findFirstSrcInTag(originalHTML, tag); src != "" {
-		return resolveURL(baseURL, src)
+		return resolveURL(base, src)
 	}
 	// 3. Aus JSON-LD
 	if src := jsonldFunc(originalHTML); src != "" {
-		return resolveURL(baseURL, src)
+		return resolveURL(base, src)
+	}
+	return ""
+}
+
+// Helfer: einfache Dateiendungsprüfung zur Unterscheidung Audio/Video
+func isAudioURL(u string) bool {
+	u = strings.ToLower(strings.TrimSpace(u))
+	if u == "" {
+		return false
+	}
+	// gängige Audio-Endungen
+	return strings.HasSuffix(u, ".mp3") || strings.HasSuffix(u, ".m4a") || strings.HasSuffix(u, ".aac") || strings.HasSuffix(u, ".wav") || strings.HasSuffix(u, ".ogg") || strings.HasSuffix(u, ".flac")
+}
+
+func isVideoURL(u string) bool {
+	u = strings.ToLower(strings.TrimSpace(u))
+	if u == "" {
+		return false
+	}
+	// gängige Video-Endungen
+	return strings.HasSuffix(u, ".mp4") || strings.HasSuffix(u, ".webm") || strings.HasSuffix(u, ".m3u8") || strings.HasSuffix(u, ".mov") || strings.HasSuffix(u, ".ogg") || strings.HasSuffix(u, ".avi") || strings.HasSuffix(u, ".mkv")
+}
+
+// rekursive Suche nach contentUrl in JSON-LD, aber gefiltert nach Art ("audio"|"video")
+func findContentURLInJSONValueForKind(v interface{}, kind string) string {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		// Wenn das Objekt einen @type oder type hat, prüfen wir diesen
+		if t, ok := val["@type"].(string); ok {
+			tLower := strings.ToLower(t)
+			if kind == "audio" && strings.Contains(tLower, "audio") {
+				if s, ok := val["contentUrl"].(string); ok && s != "" && isAudioURL(s) {
+					return s
+				}
+				if s, ok := val["url"].(string); ok && s != "" && isAudioURL(s) {
+					return s
+				}
+			}
+			if kind == "video" && strings.Contains(tLower, "video") {
+				if s, ok := val["contentUrl"].(string); ok && s != "" && isVideoURL(s) {
+					return s
+				}
+				if s, ok := val["url"].(string); ok && s != "" && isVideoURL(s) {
+					return s
+				}
+			}
+		}
+		// direkte Unterobjekte audio/video
+		if audioObj, ok := val["audio"].(map[string]interface{}); ok && kind == "audio" {
+			if s, ok := audioObj["contentUrl"].(string); ok && s != "" {
+				return s
+			}
+			if s, ok := audioObj["url"].(string); ok && s != "" {
+				return s
+			}
+		}
+		if videoObj, ok := val["video"].(map[string]interface{}); ok && kind == "video" {
+			if s, ok := videoObj["contentUrl"].(string); ok && s != "" {
+				return s
+			}
+			if s, ok := videoObj["url"].(string); ok && s != "" {
+				return s
+			}
+		}
+		// generischer contentUrl: nur zurückgeben, wenn Endung passt
+		if s, ok := val["contentUrl"].(string); ok && s != "" {
+			if kind == "audio" && isAudioURL(s) {
+				return s
+			}
+			if kind == "video" && isVideoURL(s) {
+				return s
+			}
+		}
+		// rekursiv in alle Felder
+		for _, v2 := range val {
+			if s := findContentURLInJSONValueForKind(v2, kind); s != "" {
+				return s
+			}
+		}
+	case []interface{}:
+		for _, e := range val {
+			if s := findContentURLInJSONValueForKind(e, kind); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// generische, unspezifische Suche (bleibt als Fallback)
+func findContentURLInJSONValue(v interface{}) string {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		if s, ok := val["contentUrl"].(string); ok && s != "" {
+			return s
+		}
+		if audioObj, ok := val["audio"].(map[string]interface{}); ok {
+			if s, ok := audioObj["contentUrl"].(string); ok && s != "" {
+				return s
+			}
+		}
+		if videoObj, ok := val["video"].(map[string]interface{}); ok {
+			if s, ok := videoObj["contentUrl"].(string); ok && s != "" {
+				return s
+			}
+		}
+		for _, v2 := range val {
+			if s := findContentURLInJSONValue(v2); s != "" {
+				return s
+			}
+		}
+	case []interface{}:
+		for _, e := range val {
+			if s := findContentURLInJSONValue(e); s != "" {
+				return s
+			}
+		}
 	}
 	return ""
 }
@@ -380,16 +575,21 @@ func findAudioInJSONLD(htmlStr string) string {
 	}
 	var audio string
 	doc.Find("script[type='application/ld+json']").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		jsonText := s.Text()
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(jsonText), &data); err == nil {
-			if val, ok := data["contentUrl"].(string); ok && val != "" {
-				audio = val
+		jsonText := strings.TrimSpace(s.Text())
+		if jsonText == "" {
+			return true
+		}
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(jsonText), &parsed); err == nil {
+			// versuche gezielt audio zu finden
+			if found := findContentURLInJSONValueForKind(parsed, "audio"); found != "" {
+				audio = found
 				return false
 			}
-			if audioObj, ok := data["audio"].(map[string]interface{}); ok {
-				if val, ok := audioObj["contentUrl"].(string); ok && val != "" {
-					audio = val
+			// fallback: generisch, aber stelle sicher, dass es kein Video ist
+			if found := findContentURLInJSONValue(parsed); found != "" {
+				if isAudioURL(found) {
+					audio = found
 					return false
 				}
 			}
@@ -410,16 +610,21 @@ func findVideoInJSONLD(htmlStr string) string {
 	}
 	var video string
 	doc.Find("script[type='application/ld+json']").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		jsonText := s.Text()
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(jsonText), &data); err == nil {
-			if val, ok := data["contentUrl"].(string); ok && val != "" {
-				video = val
+		jsonText := strings.TrimSpace(s.Text())
+		if jsonText == "" {
+			return true
+		}
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(jsonText), &parsed); err == nil {
+			// versuche gezielt video zu finden
+			if found := findContentURLInJSONValueForKind(parsed, "video"); found != "" {
+				video = found
 				return false
 			}
-			if videoObj, ok := data["video"].(map[string]interface{}); ok {
-				if val, ok := videoObj["contentUrl"].(string); ok && val != "" {
-					video = val
+			// fallback: generisch, aber stelle sicher, dass es ein Video ist
+			if found := findContentURLInJSONValue(parsed); found != "" {
+				if isVideoURL(found) {
+					video = found
 					return false
 				}
 			}
@@ -429,11 +634,17 @@ func findVideoInJSONLD(htmlStr string) string {
 	return video
 }
 
-func resolveURL(base, ref string) string {
-	baseURL, err1 := url.Parse(base)
-	refURL, err2 := url.Parse(ref)
-	if err1 == nil && err2 == nil && baseURL != nil {
-		return baseURL.ResolveReference(refURL).String()
+func resolveURL(base *url.URL, ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return ""
+	}
+	refURL, err := url.Parse(ref)
+	if err == nil && (refURL.IsAbs() || base == nil) {
+		return refURL.String()
+	}
+	if base != nil {
+		return base.ResolveReference(refURL).String()
 	}
 	return ref
 }
@@ -485,7 +696,7 @@ func cleanUpText(text string) string {
 	return cleanText
 }
 
-func buildResultJSON(title, image, video, audio, cleanText string, bodyHTML template.HTML, ogJSONString string) string {
+func buildResultJSON(title, image, video, audio, cleanText string, bodyHTML string, ogJSONString string) string {
 	var ogData map[string]interface{}
 	_ = json.Unmarshal([]byte(ogJSONString), &ogData)
 	jsonMap := map[string]interface{}{
@@ -494,7 +705,7 @@ func buildResultJSON(title, image, video, audio, cleanText string, bodyHTML temp
 		"video":     video,
 		"audio":     audio,
 		"clear":     cleanText,
-		"html":      string(bodyHTML),
+		"html":      bodyHTML,
 		"opengraph": ogData,
 	}
 	jsonBytes, _ := json.MarshalIndent(jsonMap, "", "  ")
