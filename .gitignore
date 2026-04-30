@@ -45,3 +45,8 @@ pnpm-lock.yaml
 *.out
 vendor/
 cache/
+agents.md
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
