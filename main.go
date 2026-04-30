@@ -28,7 +28,9 @@ var (
 	httpClient = &http.Client{
 		Timeout: 15 * time.Second,
 	}
-	pageTmpl = template.Must(template.New("page").Parse(pageTemplate))
+	pageTmpl = template.Must(template.New("page").Funcs(template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+	}).Parse(pageTemplate))
 )
 
 const pageTemplate = `
@@ -72,32 +74,46 @@ const pageTemplate = `
 			<img src="{{.Image}}" alt="Artikelbild">
 		{{end}}
 		{{if .Video}}
-			<div id="video-container" style="max-width:400px;display:block;margin-bottom:1em;">
-				<video id="video" controls style="width:100%;"></video>
-			</div>
-			<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-			<script>
-			(function() {
-				var videoSrc = "{{.Video}}";
-				var video = document.getElementById('video');
-				if (videoSrc && videoSrc.endsWith('.m3u8')) {
-					if (window.Hls && Hls.isSupported()) {
-						var hls = new Hls();
-						hls.loadSource(videoSrc);
-						hls.attachMedia(video);
-					} else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-						video.src = videoSrc;
-					} else {
-						document.getElementById('video-container').innerHTML = '<div style="color:red;">Dein Browser unterstützt dieses Videoformat nicht direkt. Bitte verwende Safari oder installiere eine HLS-Erweiterung.</div>';
+			{{if (hasPrefix .Video "blob:")}}
+				<div style="max-width:400px;display:block;margin-bottom:1em;">
+					<strong>Hinweis:</strong> <span style="color:orange;">blob:-URLs funktionieren nur im Browser-Kontext und können nicht direkt heruntergeladen werden.</span>
+					<br>
+					<code>{{.Video}}</code>
+				</div>
+			{{else}}
+				<div id="video-container" style="max-width:400px;display:block;margin-bottom:1em;">
+					<video id="video" controls style="width:100%;"></video>
+				</div>
+				<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+				<script>
+				(function() {
+					var videoSrc = "{{.Video}}";
+					var video = document.getElementById('video');
+					if (videoSrc && videoSrc.endsWith('.m3u8')) {
+						if (window.Hls && Hls.isSupported()) {
+							var hls = new Hls();
+							hls.loadSource(videoSrc);
+							hls.attachMedia(video);
+						} else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+							video.src = videoSrc;
+						} else {
+							document.getElementById('video-container').innerHTML = '<div style="color:red;">Dein Browser unterstützt dieses Videoformat nicht direkt. Bitte verwende Safari oder installiere eine HLS-Erweiterung.</div>';
+						}
 					}
-				} else if (videoSrc) {
-					video.src = videoSrc;
-				}
-			})();
-			</script>
+				})();
+				</script>
+			{{end}}
 		{{end}}
 		{{if .Audio}}
-			<audio src="{{.Audio}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></audio>
+			{{if (hasPrefix .Audio "blob:")}}
+				<div style="max-width:400px;display:block;margin-bottom:1em;">
+					<strong>Hinweis:</strong> <span style="color:orange;">blob:-URLs funktionieren nur im Browser-Kontext und können nicht direkt heruntergeladen werden.</span>
+					<br>
+					<code>{{.Audio}}</code>
+				</div>
+			{{else}}
+				<audio src="{{.Audio}}" controls style="max-width:400px;display:block;margin-bottom:1em;"></audio>
+			{{end}}
 		{{end}}
 		<h3>Bereinigter Text:</h3>
 		<textarea readonly>{{.CleanText}}</textarea>
